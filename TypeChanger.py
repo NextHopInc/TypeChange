@@ -2,7 +2,6 @@
 #Date : Feb 19 2025   
 #Description : Finds user inputed company and then changes the assets associated with that company from type "Laptop" , "Desktop" to "Managed Workstation"
 
-
 #Hey Leo!!!
 #I have built a little error handling into this program, not too much yet, but I think it gets most of the errors. 
 #If you manage to break the program or notice any errors in the return configurations or anything you want changed let me know. 
