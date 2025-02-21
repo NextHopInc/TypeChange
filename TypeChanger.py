@@ -47,7 +47,6 @@ def get_user_input() -> str:
 
             if(right_input == 'y' or right_input == 'Y'):
                 return company_name
-    return ""
         
 
 #Find the company in connectwise
@@ -56,33 +55,38 @@ def find_company_connectwise(company_name : str)->dict:
     try: 
         results = req.get(url=f'{CW_URL}company/companies?conditions=name like "%{company_name}%"&fields=name,id,identifier' , headers=CW_HEADER)
         #INFO if company is found and the results are greater than 0 meaning if there are results
-        if(results.status_code == 200 and len(results.json()) > 0):
+        if(results.status_code == 200 and len(results.json()) == 1):
             print(f"Company Found! Here are the details \n *******************************************\n{results.json()}\n*******************************************")
             #Check with user if the company found is the correct company 
             valid = input("Is this the right company y/n ==>> ")
             if(valid == "y" or valid == "Y"):
                 return results.json()[0]
             else:
-                #Else there might be multiple returned values meaning multiple companies with similar names 
-                list_shown = input("Does the company exist within the list shown? y/n ==>> ")
-                if(list_shown == 'y' or list_shown == 'Y'):
-                    counter = 0
-                    #Layout the companies with list position, allowing the user to identify the correct position of company within the list  
-                    for item in results.json():
-                        print(f"Company name ==>> {item.get("name")} Position ==>> {counter}")
-                        counter += 1
-                    index_value = input("What is the position of the company in the list ==>> ")
-                    #Check with user if the company selected is the right company 
-                    right_choice = input(f"You have chosen {results.json()[int(index_value)]}. Is this right y/n ==>> ")
-                    if(right_choice == "y" or right_choice == 'y'):
-                        return results.json()[int(index_value)]
-                    else:
-                        print("Try restarting program and re-entering company name")
-                        exit()
+                return -1
+        elif(results.status_code == 200 and len(results.json()) > 1):
+            #Else there might be multiple returned values meaning multiple companies with similar names 
+            counter = 0
+                #Layout the companies with list position, allowing the user to identify the correct position of company within the list  
+            for item in results.json():
+                print(f"Company name ==>> {item.get("name")} Position ==>> {counter}")
+                counter += 1
+            index_value = input("What is the position of the company in the list. Input n if company is noth there ==>> ")
+            #Check with user if the company selected is the right company 
+            if(index_value != "n" or index_value != "N"):
+                right_choice = input(f"You have chosen {results.json()[int(index_value)]}. Is this right y/n ==>> ")
+                if(right_choice == "y" or right_choice == 'y'):
+                    return results.json()[int(index_value)]
+
+            else:
+                #Company was not in the list provided 
+                print("Company was not in the list provided")
+                return -1
         else:
             print("Couldn't find company. Check spelling of company name. Make sure it is the NAME of comapny and not identifier")
+            return -1
     except Exception as e:
         print(e)
+        return -1
 
 #Getting company configurations 
 def get_company_assets(company_details : dict)-> list: 
@@ -90,15 +94,15 @@ def get_company_assets(company_details : dict)-> list:
     config_list = []
     try:
         results = req.get(url=f'{CW_URL}company/configurations?conditions=company/id={company_details.get("id")}&pageSize=1000' , headers=CW_HEADER)
-        print(results.url)
+
         if(results.status_code == 200 and len(results.json()) > 0):
             print(f"Company Assets Found! Are these the assets you want to change \n*******************************************\n")
             for item in results.json():
                 #Only gathering the assets if they are equal to a desktop or laptop.... Can add server to it as well later.
-                if(item.get("type").get("name") == "Desktop" or item.get("type").get("name") == "Laptop"):
-                    #Printing out the names of the assets for the user to view. Make sure the assets are correct
-                    print(f"Name ==> {item.get("name")} Type ==>> {item.get("type").get("name")}")
-                    config_list.append(item)
+                    if(item.get("type").get("name") == "Desktop" or item.get("type").get("name") == "Laptop"):
+                        #Printing out the names of the assets for the user to view. Make sure the assets are correct
+                        print(f"Name ==> {item.get("name")} Type ==>> {item.get("type").get("name")}")
+                        config_list.append(item)
             
             print("\n*******************************************")
             valid = input("Are those assets correct? Review them carefully! y/n ==>> ")
@@ -106,49 +110,87 @@ def get_company_assets(company_details : dict)-> list:
                 return config_list
             else:
                 print("These aren't the assets you're looking for....")
-                exit()
+                return -2
     except Exception as e:
         print("Error in get company assets")
         print(e)
 #This is where the change of the assets occurs 
 def change_type_name(config_list : list):
-    print("Changing type")
-    patch_data = [{
-                    "op" : "replace",
-                    "path" : "type",
-                    "value" : {
-                        "name" : "Managed Workstation"
-                    }
-                }]
-    
-    #id of managed workstation == >> 17
-    for item in config_list:
-        #Remove If statement before deploying
-        if(item.get("name") == "Prison Mike"):
+    try:
+        print("Changing type")
+        patch_data = [{
+                        "op" : "replace",
+                        "path" : "type",
+                        "value" : {
+                            "name" : "Managed Workstation"
+                        }
+                    }]
+        
+        #id of managed workstation == >> 17
+        for item in config_list:
+            #Remove If statement before deploying
             
+                
             results = req.patch(url=f'{CW_URL}company/configurations/{item.get("id")}/changeType', json=patch_data , headers=CW_HEADER)
             print(f"URL of Asset ==>> {results.url}")
-        #Checking if the patch request was done correctly. If not then stop the code and tell user to restart program.
-        if(results.status_code == 200):
-            print("Change Successful")
-        else:
-            print("Change Unsuccessful. Shutting Program down")
-            print(results.json())
-            exit()
+            #Checking if the patch request was done correctly. If not then stop the code and tell user to restart program.
+            if(results.status_code == 200):
+                print("Change Successful")
+            else:
+                print("Change Unsuccessful. Shutting Program down")
+                print(results.json())
+                return -3
+    except UnboundLocalError:
+        print("PC Prison Mike is not found")
+        return -3
+    except Exception as e:
+        return -3
+
         
+#Gets the error code from the functions and prints out the translation
+def error_handler(error_code : int) -> None:
     
+    match(error_code):
+        case -1:
+            print("Can't find company. ")
+        case -2:
+            print("Can't find any configurations for the company. ")
+        case -3:
+            print("Couldn't change the type of the configuration. ")
+        case _:
+            print("An error occured while searching. Please try again")
+
+
 
 
 if __name__ == "__main__":
-    #Prompt User to get Company name. Do a little data cleaning. 
-    company_name = get_user_input()
-    print(company_name)
-    #Find the company in Connecwise 
-    company_details = find_company_connectwise(company_name=company_name)
-    #Finding the configurations for the company 
-    config_list = get_company_assets(company_details=company_details)
-    #Change the Configuration data type for the company 
-    change_type_name(config_list=config_list)
+
+    running = True 
+    while running:
+        #Prompt User to get Company name. Do a little data cleaning. 
+        company_name = get_user_input()
+        print(company_name)
+        #Find the company in Connecwise 
+        company_details = find_company_connectwise(company_name=company_name)
+
+        if(type(company_details) != int):
+            #Finding the configurations for the company 
+            config_list = get_company_assets(company_details=company_details)
+            if(type(config_list) != int):
+            #Change the Configuration data type for the company 
+                change_type_name(config_list=config_list)
+            else:
+                error_handler(config_list)
+        else:
+            print("There seems to have been an error within the search....")
+            error_handler(company_details)
+        con = input("Would you like to continue? y/n ==>> ")
+        con = con.lower()
+
+        if(con == "n"):
+            print("Goodbye")
+            running = False
+        
 
 
 
